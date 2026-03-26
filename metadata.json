@@ -1,0 +1,5 @@
+{
+  "name": "RATE System Framework",
+  "description": "A governed system architecture enforcing artifact-based state transitions and signal integrity.",
+  "requestFramePermissions": []
+}
