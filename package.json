@@ -13,7 +13,8 @@
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
     "test": "tsx --test 'src/**/*.test.ts' 'server/**/*.test.ts'",
-    "check": "npm run lint && npm run test"
+    "check": "npm run lint && npm run test",
+    "dice:verify": "tsx scripts/dice-verify.ts"
   },
   "dependencies": {
     "@google/genai": "^1.29.0",

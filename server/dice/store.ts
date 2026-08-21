@@ -1,6 +1,7 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { BudgetWindow } from './budget';
+import type { LensOverride } from './lens';
 import type { DeskId, Signal } from './types';
 
 /**
@@ -16,6 +17,8 @@ export interface DiceState {
   signals: Record<string, Signal>;
   budgets: Partial<Record<DeskId, BudgetWindow>>;
   lastDiscovery: Partial<Record<DeskId, string>>;
+  /** Operator lens edits, layered over the shipped defaults. */
+  lenses: Partial<Record<DeskId, LensOverride>>;
 }
 
 export interface DiceRepository {
@@ -28,9 +31,11 @@ export interface DiceRepository {
   saveBudget(window: BudgetWindow): Promise<void>;
   lastDiscovery(deskId: DeskId): Promise<string | null>;
   markDiscovery(deskId: DeskId, at: string): Promise<void>;
+  lens(deskId: DeskId): Promise<LensOverride | null>;
+  saveLens(deskId: DeskId, lens: LensOverride): Promise<void>;
 }
 
-const empty = (): DiceState => ({ signals: {}, budgets: {}, lastDiscovery: {} });
+const empty = (): DiceState => ({ signals: {}, budgets: {}, lastDiscovery: {}, lenses: {} });
 
 export class MemoryDiceRepository implements DiceRepository {
   protected state: DiceState = empty();
@@ -74,6 +79,13 @@ export class MemoryDiceRepository implements DiceRepository {
   }
   async markDiscovery(deskId: DeskId, at: string) {
     this.state.lastDiscovery[deskId] = at;
+    await this.persist();
+  }
+  async lens(deskId: DeskId) {
+    return this.state.lenses?.[deskId] ?? null;
+  }
+  async saveLens(deskId: DeskId, lens: LensOverride) {
+    this.state.lenses = { ...this.state.lenses, [deskId]: lens };
     await this.persist();
   }
 
@@ -123,4 +135,6 @@ export class FileDiceRepository extends MemoryDiceRepository {
   async saveBudget(window: BudgetWindow) { await this.load(); return super.saveBudget(window); }
   async lastDiscovery(deskId: DeskId) { await this.load(); return super.lastDiscovery(deskId); }
   async markDiscovery(deskId: DeskId, at: string) { await this.load(); return super.markDiscovery(deskId, at); }
+  async lens(deskId: DeskId) { await this.load(); return super.lens(deskId); }
+  async saveLens(deskId: DeskId, lens: LensOverride) { await this.load(); return super.saveLens(deskId, lens); }
 }

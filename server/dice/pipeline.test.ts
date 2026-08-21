@@ -89,7 +89,7 @@ test('a colliding signal is kept out of the priority queue', () => {
     subreddit: 'jobs', postId: 'shared1', author: 'shared_person',
     title: '', excerpt: '', permalink: '', createdAt: item.createdAt,
     discoveredAt: item.createdAt, scores: { fit: 0, intent: 0, freshnessHours: 0, priority: 0 },
-    reasons: [], state: 'replied', screenedReason: null,
+    reasons: [], state: 'replied', screenedReason: null, capture: 'source', ageUnknown: false,
     actions: { reply: { allowed: true, reason: '' }, message: { allowed: false, reason: '' } },
     collision: null, history: [{ at: item.createdAt, event: 'replied' }],
   };

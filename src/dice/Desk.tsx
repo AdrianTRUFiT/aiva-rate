@@ -1,7 +1,9 @@
 import { useState } from 'react';
-import { AlertTriangle, ArrowUpRight, Ban, Check, Clock, Eye, Lock, Users } from 'lucide-react';
+import { AlertTriangle, ArrowUpRight, Ban, Check, ChevronDown, Clock, Eye, FileText, Lock, Users } from 'lucide-react';
 import * as api from './api';
 import type { DeskView, SignalState } from './api';
+import { Ingest } from './Ingest';
+import { LensEditor } from './LensEditor';
 import { cn } from '../lib/utils';
 
 /**
@@ -23,6 +25,7 @@ const FILTERS: { state: SignalState | 'all'; label: string }[] = [
   { state: 'closed', label: 'Closed' },
   { state: 'rejected', label: 'Rejected' },
   { state: 'do-not-contact', label: 'Screened out' },
+  { state: 'blocked', label: 'Blocked' },
   { state: 'all', label: 'Everything' },
 ];
 
@@ -52,6 +55,7 @@ export const Desk = ({
   const [active, setActive] = useState<string>('priority');
   const [pending, setPending] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [panel, setPanel] = useState<'none' | 'ingest' | 'lens'>('ingest');
 
   const transition = async (id: string, state: SignalState) => {
     setPending(id);
@@ -99,9 +103,35 @@ export const Desk = ({
               {scope.refused.length} configured subreddit{scope.refused.length === 1 ? '' : 's'} refused by policy
             </span>
           )}
-          {desk.simulated && <span style={{ color: 'var(--warning)' }}>simulated desk</span>}
+          {view.origins.manual > 0 && (
+            <span style={{ color: 'var(--calm)' }}>
+              {view.origins.manual} real post{view.origins.manual === 1 ? '' : 's'} pasted
+            </span>
+          )}
+          {view.origins.automated > 0 && desk.simulated && (
+            <span style={{ color: 'var(--warning)' }}>{view.origins.automated} from fixture</span>
+          )}
         </div>
       </div>
+
+      <div className="flex flex-wrap gap-2">
+        {(['ingest', 'lens'] as const).map((p) => (
+          <button
+            key={p}
+            onClick={() => setPanel(panel === p ? 'none' : p)}
+            className={cn(
+              'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
+              panel === p ? 'text-heading bg-surface-muted' : 'text-muted hover:text-body',
+            )}
+          >
+            <ChevronDown size={12} className={cn('transition-transform', panel !== p && '-rotate-90')} />
+            {p === 'ingest' ? 'Paste posts' : 'Lens'}
+          </button>
+        ))}
+      </div>
+
+      {panel === 'ingest' && <Ingest deskId={desk.id} onIngested={onChanged} />}
+      {panel === 'lens' && <LensEditor deskId={desk.id} lens={view.lens} onSaved={onChanged} />}
 
       <div className="flex flex-wrap gap-1.5">
         {FILTERS.map((f) => {
@@ -153,7 +183,17 @@ export const Desk = ({
                     <span>u/{signal.author}</span>
                     <span>·</span>
                     <Clock size={11} />
-                    <span className="tabular-nums">{Math.round(signal.scores.freshnessHours)}h</span>
+                    <span className="tabular-nums">
+                      {signal.ageUnknown ? 'age unknown' : `${Math.round(signal.scores.freshnessHours)}h`}
+                    </span>
+                    {signal.capture === 'url-only' && (
+                      <>
+                        <span>·</span>
+                        <span className="inline-flex items-center gap-1" title="Scored on the title only">
+                          <FileText size={11} /> title only
+                        </span>
+                      </>
+                    )}
                   </div>
                   <h3 className="text-base font-semibold text-heading">{signal.title}</h3>
                 </div>

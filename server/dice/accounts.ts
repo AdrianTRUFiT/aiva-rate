@@ -1,5 +1,6 @@
 import { PERSONA_ORDER, getPersona } from '../../src/pw/personas';
 import { authStatusFor, configuredLimits, grantsFor, limitsFor } from './credentials';
+import { mergeLens, type LensOverride } from './lens';
 import type { Desk, DeskId, DeskLens } from './types';
 
 /**
@@ -98,7 +99,7 @@ const LENSES: Record<DeskId, Omit<DeskLens, 'pressure'>> = {
  * message grant — simulating a capability the policy has decided not to have
  * would teach an operator the wrong thing about what this system does.
  */
-export function buildDesk(id: DeskId, simulate = false): Desk {
+export function buildDesk(id: DeskId, simulate = false, lensOverride: LensOverride | null = null): Desk {
   const persona = getPersona(id);
   const auth = authStatusFor(id);
   const configured = auth !== 'not-configured';
@@ -115,9 +116,16 @@ export function buildDesk(id: DeskId, simulate = false): Desk {
     limits:
       configuredLimits(id) ??
       (simulated ? { requestsPerWindow: SIMULATED_LIMITS[id], windowSeconds: 3600 } : limitsFor(id)),
-    lens: { ...LENSES[id], pressure: persona.pressure },
+    // Shipped defaults, with the operator's edits layered over them.
+    lens: mergeLens({ ...LENSES[id], pressure: persona.pressure }, lensOverride),
   };
 }
+
+/** The shipped defaults for a desk, before any operator edit. */
+export const defaultLens = (id: DeskId): DeskLens => ({
+  ...LENSES[id],
+  pressure: getPersona(id).pressure,
+});
 
 /**
  * Limits the fixture emulates per desk. Deliberately different from each other

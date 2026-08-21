@@ -1,5 +1,12 @@
 import { resolveActions, screenSignal, searchableSubreddits } from './policy';
-import { PRIORITY_THRESHOLD, RELEVANT_THRESHOLD, STRONG_THRESHOLD, dedupeKey, scoreSignal } from './scoring';
+import {
+  PRIORITY_THRESHOLD,
+  RELEVANT_THRESHOLD,
+  STRONG_THRESHOLD,
+  dedupeKey,
+  scoreSignal,
+  type Evidence,
+} from './scoring';
 import { checkCollision, type CollisionIndex } from './collision';
 import type { Desk, FunnelCounts, RawSignal, Signal } from './types';
 
@@ -28,9 +35,19 @@ export interface PipelineInput {
   /** Dedupe keys already present in the desk's stored queue. */
   known: Set<string>;
   now: Date;
+  /**
+   * How much of each post we have. Per-signal, because a single manual ingest
+   * can mix bare links with fully pasted posts.
+   */
+  evidenceFor?: (raw: RawSignal) => Evidence;
 }
 
-export function runPipeline({ desk, raw, index, known, now }: PipelineInput): PipelineResult {
+const DEFAULT_EVIDENCE: Evidence = { capture: 'source', ageUnknown: false };
+
+export function runPipeline({ desk, raw, index, known, now, evidenceFor }: PipelineInput): PipelineResult {
+  // Operator-set thresholds, falling back to the shipped defaults.
+  const minScore = desk.lens.minScore ?? RELEVANT_THRESHOLD;
+  const maxAgeHours = desk.lens.maxAgeHours ?? Infinity;
   const counts: FunnelCounts = {
     discovered: raw.length,
     afterDedup: 0,
@@ -55,6 +72,7 @@ export function runPipeline({ desk, raw, index, known, now }: PipelineInput): Pi
   const signals: Signal[] = [];
 
   for (const item of unique) {
+    const evidence = evidenceFor?.(item) ?? DEFAULT_EVIDENCE;
     const screened = screenSignal(item);
     const collision = checkCollision(index, desk.id, item.author, item.subreddit, item.postId);
 
@@ -69,23 +87,32 @@ export function runPipeline({ desk, raw, index, known, now }: PipelineInput): Pi
         reasons: [screened.reason],
         actions: resolveActions(desk, item.subreddit, screened, collision),
         collision,
+        evidence,
       }));
       continue;
     }
 
     /* 3. Score. */
-    const { scores, reasons, commercial } = scoreSignal(desk, item, now);
+    const { scores, reasons, commercial } = scoreSignal(desk, item, now, evidence);
 
-    // Promotional and bot-shaped posts are rejected outright rather than
-    // ranked low, so they never occupy space in a queue.
-    if (commercial || scores.priority < RELEVANT_THRESHOLD) {
+    // Promotional posts, posts below the desk's floor, and posts older than the
+    // desk's recency window are rejected outright rather than ranked low, so
+    // they never occupy space in a queue.
+    const tooOld = !evidence.ageUnknown && scores.freshnessHours > maxAgeHours;
+
+    if (commercial || tooOld || scores.priority < minScore) {
       signals.push(makeSignal(desk, item, now, {
         state: 'rejected',
-        screenedReason: commercial ? 'Promotional or bot-shaped post.' : 'Below the relevance bar.',
+        screenedReason: commercial
+          ? 'Promotional or bot-shaped post.'
+          : tooOld
+            ? `Older than this desk's ${maxAgeHours}h window.`
+            : `Below this desk's score floor of ${minScore}.`,
         scores,
         reasons,
         actions: resolveActions(desk, item.subreddit, screened, collision),
         collision,
+        evidence,
       }));
       continue;
     }
@@ -103,6 +130,7 @@ export function runPipeline({ desk, raw, index, known, now }: PipelineInput): Pi
       reasons,
       actions: resolveActions(desk, item.subreddit, screened, collision),
       collision,
+      evidence,
     }));
   }
 
@@ -116,9 +144,14 @@ function makeSignal(
   desk: Desk,
   raw: RawSignal,
   now: Date,
-  rest: Pick<Signal, 'state' | 'screenedReason' | 'scores' | 'reasons' | 'actions' | 'collision'>,
+  rest: Pick<Signal, 'state' | 'screenedReason' | 'scores' | 'reasons' | 'actions' | 'collision'> & {
+    evidence: Evidence;
+  },
 ): Signal {
+  const { evidence, ...signal } = rest;
   return {
+    capture: evidence.capture,
+    ageUnknown: evidence.ageUnknown,
     id: `${desk.id}:${dedupeKey(raw)}`,
     deskId: desk.id,
     source: raw.sourceId.split(':')[0],
@@ -132,7 +165,7 @@ function makeSignal(
     createdAt: raw.createdAt,
     discoveredAt: now.toISOString(),
     history: [{ at: now.toISOString(), event: 'discovered' }],
-    ...rest,
+    ...signal,
   };
 }
 

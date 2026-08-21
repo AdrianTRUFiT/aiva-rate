@@ -159,16 +159,107 @@ no password.
 One shared password is modest by design; a real identity provider is the right
 answer once more than a few people use it.
 
+## Operator-assisted ingest — the working path today
+
+Automated Reddit discovery is blocked on commercial API access (below). Until
+that resolves, DICE runs on real data through operator-assisted ingest: you
+browse Reddit as a human, logged into the company account, and paste what you
+found.
+
+```
+10 pasted → 9 new → 4 relevant → 1 priority   (2 screened out)
+```
+
+That is one real morning's paste. The duplicate collapsed, the promotional post
+and the off-lens laptop question were rejected, the r/depression post was
+blocked, and the crisis post was screened out — all through the **same**
+pipeline an automated source feeds. Dedupe, safety screen, subreddit policy,
+fit/intent scoring, collision check, queue: identical code, identical order.
+
+**Paste format.** A line that is a URL starts a new post; anything after it is
+that post's text. So a bare list of links works, and so does a list of links
+with the posts pasted underneath:
+
+```
+https://www.reddit.com/r/jobs/comments/abc123/laid_off_this_morning/
+u/their_handle
+posted: 2h
+Fifteen minutes in a meeting room and that was it…
+
+https://www.reddit.com/r/layoffs/comments/def456/role_eliminated/
+```
+
+`u/handle` and `posted: 3h` are optional. Tracking parameters are stripped so
+`?utm_source=share` cannot defeat deduplication, comment permalinks resolve to
+their parent post, and `redd.it` short links are refused with an instruction
+rather than silently dropped (they carry no subreddit).
+
+**Scoring degrades honestly.** A bare URL is scored on its title and the card
+says *"title only"*; paste the body and the score sharpens. An unknown post age
+is neither credited as fresh nor penalised as stale — it gets a middle recency
+factor and the card reads *"age unknown"*. A missing body is explicitly not
+treated as a short one, because an unread post is not a terse post.
+
+**No API request is made and no rate budget is consumed.** The response says so
+in as many words. A budget number that counted requests nobody sent would be a
+lie about the one figure keeping this system inside its limits.
+
+**Nothing is fetched server-side.** DICE does not pull post bodies out of Reddit
+outside the Data API. That would be the same category of move as rotating
+accounts to beat a rate limit. Everything here comes from what the operator
+could already see in their own browser.
+
+## The editable lens
+
+Each desk's listening lens is configuration, not code. From the console an
+operator can set:
+
+| Field | Effect |
+|---|---|
+| Subreddits | Which communities this desk watches |
+| Keywords / cues | Phrases that raise fit |
+| Exclusions | Phrases that disqualify a post |
+| Minimum score | Priority floor; below it a signal is rejected with that stated reason |
+| Recency window | Posts older than this are dropped (unknown ages are kept) |
+
+The policy floor still wins. Adding a blocked subreddit **fails the whole save**
+with the reason per subreddit, rather than being silently stripped — quietly
+altering somebody's stated intent is worse than telling them no.
+
+## dice:verify
+
+```bash
+npm run dice:verify -- --desk stabilizer
+```
+
+Checks one desk's Reddit credentials without ever printing them: token
+handshake, which account the token belongs to, one real search inside the
+policy-allowed subreddits, and the rate limit Reddit actually assigned. Output
+is safe to paste into a ticket — no client id, no secret, no token.
+
+It exists so credentials are verified by whoever holds them rather than handed
+to someone else to test with. Not required for operator-assisted ingest.
+
 ## The provider seam
 
 DICE never talks to Reddit. It asks a `SignalSource` for signals within a budget
 the caller already reserved.
 
 **The real Reddit adapter is not implemented.** It stays behind this seam until
-the authorised access model is resolved: credentials, the rate limit actually
-assigned to each client, and a read of each target subreddit's current rules.
-Adding it is a new class implementing `SignalSource` plus a branch in
-`sources/index.ts`; nothing upstream changes.
+the authorised access model is resolved.
+
+That is not just a credentials question. Reddit names lead generation as
+commercial use requiring prior approval and a paid contract — the free 100 QPM
+tier is non-commercial only, commercial review is a separate track taking
+2–4 weeks with no guarantee, and pricing starts around $0.24/1K calls or
+~$12,000/month bundled. *(Reddit blocks Anthropic's crawler, so this is from
+secondary sources that agree with each other and with Reddit's help centre —
+verify against Reddit's own terms before committing budget.)*
+
+Adding the adapter is a new class implementing `SignalSource` plus a branch in
+`sources/index.ts`. Operator-assisted ingest is a second, push-shaped entry
+point into the same pipeline, so when the adapter lands nothing downstream of
+`runPipeline` changes and both paths coexist.
 
 The **fixture source** emulates ten separate workspaces — different pools,
 different emulated limits, deliberately overlapping authors and threads so
@@ -179,7 +270,9 @@ Nothing about a simulated desk can be mistaken for a live one.
 
 ## What is not built
 
-- **The Reddit adapter.** Blocked on authorised access, above.
+- **The Reddit adapter.** Blocked on commercial API access, above.
+- **AIOP handoff.** `Activate` records an operator decision. It does not yet
+  hand the lead to AIOP — deliberately, until this real-data path is proven.
 - **Posting.** Nothing in DICE writes to Reddit. `activated` records an operator
   decision; the reply is still made by a human in Reddit.
 - **Conversation threading.** Follow-ups and conversion history are state

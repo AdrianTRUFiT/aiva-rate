@@ -10,7 +10,27 @@ export interface DesksResponse {
   totals: { signals: number; priority: number; active: number; screenedOut: number };
 }
 
+export interface Lens {
+  subreddits: string[];
+  keywords: string[];
+  exclusions: string[];
+  minScore: number;
+  maxAgeHours: number;
+  edited: boolean;
+  defaults: { subreddits: string[]; keywords: string[]; exclusions: string[] };
+}
+
+export interface IngestResult {
+  counts: DeskSummary['counts'];
+  accepted: number;
+  failures: { line: string; reason: string }[];
+  budgetSpent: number;
+  note: string;
+}
+
 export interface DeskView {
+  lens: Lens;
+  origins: { manual: number; automated: number };
   desk: Desk;
   scope: { searchable: string[]; refused: { name: string; reason?: string }[] };
   budget: { used: number; limit: number; resetsAt: string; exhausted: boolean };
@@ -61,6 +81,12 @@ export const setState = (signalId: string, state: SignalState, note?: string) =>
     method: 'POST',
     body: JSON.stringify({ state, note }),
   });
+
+export const ingest = (deskId: string, text: string) =>
+  call<IngestResult>(`/desks/${deskId}/ingest`, { method: 'POST', body: JSON.stringify({ text }) });
+
+export const saveLens = (deskId: string, lens: Partial<Lens>) =>
+  call<{ lens: Lens }>(`/desks/${deskId}/lens`, { method: 'PUT', body: JSON.stringify(lens) });
 
 export const loadPolicy = () =>
   call<{ blocked: { name: string; reason?: string }[]; note: string }>('/policy');

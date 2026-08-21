@@ -1,11 +1,13 @@
 import express, { type Request, type Response, type Router } from 'express';
 import { config } from '../config';
-import { DESK_IDS, allDesks, buildDesk, isDeskId } from './accounts';
+import { DESK_IDS, allDesks, buildDesk, defaultLens, isDeskId } from './accounts';
 import { inspect, newWindow, spend } from './budget';
 import { annotate, buildIndex } from './collision';
 import { recommend } from './aiop';
 import { runPipeline, resolveSearchScope } from './pipeline';
 import { BLOCKED_SUBREDDITS } from './policy';
+import { DEFAULT_MAX_AGE_HOURS, DEFAULT_MIN_SCORE, validateLens } from './lens';
+import { parsePaste, toRawSignal } from './ingest';
 import { signalSource } from './sources';
 import {
   clearOperatorCookie,
@@ -83,7 +85,8 @@ export function buildDiceRoutes(deps: DiceDeps): Router {
     const all = await repo.all();
     const summaries: DeskSummary[] = [];
 
-    for (const desk of allDesks(simulating())) {
+    for (const base of allDesks(simulating())) {
+      const desk = buildDesk(base.id, simulating(), await repo.lens(base.id));
       const signals = all.filter((s) => s.deskId === desk.id);
       const window = (await repo.budget(desk.id)) ?? newWindow(desk.id, clock());
       const grant = inspect(window, desk.limits, clock());
@@ -121,7 +124,7 @@ export function buildDiceRoutes(deps: DiceDeps): Router {
     const deskId = req.params.deskId;
     if (!isDeskId(deskId)) return bad(res, 404, 'no such desk');
 
-    const desk = buildDesk(deskId, simulating());
+    const desk = buildDesk(deskId, simulating(), await repo.lens(deskId));
     const index = buildIndex(await repo.all());
     const signals = annotate(await repo.forDesk(deskId), index);
 
@@ -147,6 +150,21 @@ export function buildDiceRoutes(deps: DiceDeps): Router {
       counts: countsFor(signals),
       queue: queueCounts(signals),
       states: OPERATOR_STATES,
+      // Where this desk's signals came from. Pasted posts are real Reddit
+      // content even while automated discovery is fixture-backed.
+      origins: {
+        manual: signals.filter((sig) => sig.source === 'manual').length,
+        automated: signals.filter((sig) => sig.source !== 'manual').length,
+      },
+      lens: {
+        subreddits: desk.lens.subreddits,
+        keywords: desk.lens.keywords,
+        exclusions: desk.lens.exclusions,
+        minScore: desk.lens.minScore ?? DEFAULT_MIN_SCORE,
+        maxAgeHours: desk.lens.maxAgeHours ?? DEFAULT_MAX_AGE_HOURS,
+        edited: (await repo.lens(deskId)) !== null,
+        defaults: defaultLens(deskId),
+      },
       signals: filtered
         .sort((a, b) => b.scores.priority - a.scores.priority)
         .slice(0, 100)
@@ -161,7 +179,7 @@ export function buildDiceRoutes(deps: DiceDeps): Router {
     const deskId = req.params.deskId;
     if (!isDeskId(deskId)) return bad(res, 404, 'no such desk');
 
-    const desk = buildDesk(deskId, simulating());
+    const desk = buildDesk(deskId, simulating(), await repo.lens(deskId));
     const now = clock();
 
     if (!desk.grants.read) {
@@ -208,6 +226,100 @@ export function buildDiceRoutes(deps: DiceDeps): Router {
       spent: result.spent,
       truncated: result.truncated,
       budget: { remaining: grant.remaining, resetsAt: grant.resetsAt, exhausted: grant.exhausted },
+    });
+  });
+
+  /* ------------------------- operator-assisted ingest ------------------- */
+
+  /**
+   * Real Reddit posts, pasted by an operator who found them by hand.
+   *
+   * This is a second entry point into the *same* pipeline the automated source
+   * feeds — dedupe, safety screen, subreddit policy, scoring, collision, queue,
+   * all identical. When the Reddit adapter arrives it replaces where the raw
+   * signals come from and nothing below this line changes.
+   *
+   * It deliberately does not spend the desk's rate budget: no Reddit API call
+   * was made, and a budget number that counts requests nobody sent would be a
+   * lie about the one figure that keeps this system inside its limits.
+   */
+  router.post('/desks/:deskId/ingest', guard, express.json({ limit: '256kb' }), async (req: Request, res: Response) => {
+    const deskId = req.params.deskId;
+    if (!isDeskId(deskId)) return bad(res, 404, 'no such desk');
+
+    const { text } = (req.body ?? {}) as { text?: string };
+    if (typeof text !== 'string' || !text.trim()) return bad(res, 400, 'nothing pasted');
+
+    const now = clock();
+    const desk = buildDesk(deskId, simulating(), await repo.lens(deskId));
+    const { entries, failures } = parsePaste(text, now);
+
+    if (entries.length === 0) {
+      return bad(res, 400, failures[0]?.reason ?? 'no Reddit post URLs found in that paste');
+    }
+
+    const raw = entries.map((entry) => toRawSignal(entry, deskId, now));
+
+    // Evidence is per-entry: one paste can mix bare links with full posts.
+    const byKey = new Map(entries.map((e) => [`${e.subreddit}:${e.postId}`, e]));
+    const evidenceFor = (item: (typeof raw)[number]) => {
+      const entry = byKey.get(`${item.subreddit}:${item.postId}`);
+      return {
+        capture: (entry?.capture ?? 'url-only') as 'url-only' | 'with-body',
+        ageUnknown: entry?.createdAt == null,
+      };
+    };
+
+    const existing = await repo.forDesk(deskId);
+    const known = new Set(existing.map((sig) => `${sig.subreddit.toLowerCase()}:${sig.postId}`));
+    const index = buildIndex(await repo.all());
+
+    const { signals, counts } = runPipeline({ desk, raw, index, known, now, evidenceFor });
+
+    await repo.upsertMany(signals);
+    await repo.markDiscovery(deskId, now.toISOString());
+
+    res.json({
+      counts,
+      accepted: entries.length,
+      failures,
+      // Named explicitly so nobody reads the queue and assumes an API ran.
+      budgetSpent: 0,
+      note: 'Operator-assisted ingest. No Reddit API request was made and no rate budget was consumed.',
+    });
+  });
+
+  /* --------------------------------- lens ------------------------------ */
+
+  router.put('/desks/:deskId/lens', guard, express.json({ limit: '32kb' }), async (req: Request, res: Response) => {
+    const deskId = req.params.deskId;
+    if (!isDeskId(deskId)) return bad(res, 404, 'no such desk');
+
+    const validation = validateLens(req.body ?? {});
+
+    // Blocked subreddits fail the whole save rather than being stripped: an
+    // operator should be told r/depression is off-limits, not left wondering
+    // why their configured desk never returns anything from it.
+    if (!validation.ok) {
+      return res.status(422).json({
+        error: 'Some subreddits cannot be added — they are permanently off-limits for outreach.',
+        refused: validation.refused,
+      });
+    }
+
+    await repo.saveLens(deskId, validation.value);
+    const desk = buildDesk(deskId, simulating(), validation.value);
+
+    res.json({
+      lens: {
+        subreddits: desk.lens.subreddits,
+        keywords: desk.lens.keywords,
+        exclusions: desk.lens.exclusions,
+        minScore: desk.lens.minScore ?? DEFAULT_MIN_SCORE,
+        maxAgeHours: desk.lens.maxAgeHours ?? DEFAULT_MAX_AGE_HOURS,
+        edited: true,
+        defaults: defaultLens(deskId),
+      },
     });
   });
 

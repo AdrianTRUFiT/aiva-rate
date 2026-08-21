@@ -23,6 +23,8 @@ const signal = (over: Partial<Signal> = {}): Signal => ({
   discoveredAt: '2026-03-01T09:00:00.000Z',
   scores: { fit: 80, intent: 70, freshnessHours: 1, priority: 75 },
   reasons: [],
+  capture: 'source',
+  ageUnknown: false,
   state: 'new',
   screenedReason: null,
   actions: { reply: { allowed: true, reason: '' }, message: { allowed: false, reason: '' } },

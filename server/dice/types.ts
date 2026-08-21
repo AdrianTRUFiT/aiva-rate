@@ -49,6 +49,10 @@ export interface DeskLens {
   exclusions: string[];
   /** The pressure moment this desk is designed to address. */
   pressure: PressureId;
+  /** Priority floor for the queue. Operator-settable. */
+  minScore?: number;
+  /** Posts older than this are dropped rather than ranked. Operator-settable. */
+  maxAgeHours?: number;
 }
 
 /**
@@ -174,6 +178,13 @@ export interface Signal {
   scores: SignalScores;
   /** Plain-language explanation of why DICE surfaced this. */
   reasons: string[];
+  /**
+   * How much evidence this signal carries. A URL pasted on its own is scored on
+   * its title and says so; scoring degrades honestly rather than pretending.
+   */
+  capture: 'url-only' | 'with-body' | 'source';
+  /** True when nobody knows how old the post is, so recency is not claimed. */
+  ageUnknown: boolean;
 
   state: SignalState;
   /** Why a screened-out signal was screened out. */

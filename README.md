@@ -93,11 +93,14 @@ spent (never continuing on another desk's), no two desks may unknowingly work
 the same person, and channel actions default to denied. Crisis signals mean *do
 not contact* — screened before scoring, never queued, terminal.
 
-The real Reddit adapter sits behind a provider seam and is not implemented; the
-fixture source emulates ten workspaces so the whole workflow runs today.
+Automated Reddit discovery is blocked on commercial API access, so DICE runs on
+real data through **operator-assisted ingest**: paste the posts you found by
+hand and they go through the same pipeline — `10 pasted → 9 new → 4 relevant →
+1 priority, 2 screened out`. Each desk's lens is editable from the console,
+with the policy floor still non-overridable.
 
 ## Status
 
-The commercial path runs end to end (164 tests). Not built: refunds, a datastore
+The commercial path runs end to end (189 tests). Not built: refunds, a datastore
 that survives concurrent instances, email deliverability handling, rate
 limiting, data deletion, and anything that posts to a platform.

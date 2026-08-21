@@ -108,11 +108,11 @@ export const Dice = ({ onSignOut }: { onSignOut: () => void }) => {
         >
           <AlertTriangle size={17} className="mt-0.5 shrink-0" />
           <div>
-            <strong>Simulated desks.</strong>{' '}
+            <strong>Automated discovery is simulated.</strong>{' '}
             <span className="text-body">
-              No Reddit credentials are configured, so every desk is running against the fixture
-              source with simulated auth. Nothing here is a real Reddit account, no post is real,
-              and no action reaches Reddit.
+              No Reddit credentials are configured, so <strong>Discover</strong> returns fixture
+              data and no desk is a real Reddit account. Posts you paste yourself are real and are
+              marked as such. No action taken here reaches Reddit either way.
             </span>
           </div>
         </div>

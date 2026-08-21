@@ -52,7 +52,27 @@ export interface ScoreResult {
   commercial: boolean;
 }
 
-export function scoreSignal(desk: Desk, raw: RawSignal, now: Date): ScoreResult {
+/**
+ * How much of the post we actually have.
+ *
+ * An automated source returns everything. An operator pasting a URL on its own
+ * gives us a title and nothing else. Scoring has to degrade honestly rather
+ * than treat a missing body as a short one, or an unknown age as a fresh post.
+ */
+export interface Evidence {
+  capture: 'url-only' | 'with-body' | 'source';
+  /** True when nobody has said how old the post is. */
+  ageUnknown: boolean;
+}
+
+export const FULL_EVIDENCE: Evidence = { capture: 'source', ageUnknown: false };
+
+export function scoreSignal(
+  desk: Desk,
+  raw: RawSignal,
+  now: Date,
+  evidence: Evidence = FULL_EVIDENCE,
+): ScoreResult {
   const text = norm(`${raw.title}\n${raw.body}`);
   const reasons: string[] = [];
 
@@ -109,8 +129,12 @@ export function scoreSignal(desk: Desk, raw: RawSignal, now: Date): ScoreResult 
   if (text.includes('?')) intent += 10;
 
   // A wall of text is usually someone working something out; a one-liner is
-  // usually not enough to respond to usefully.
-  if (raw.body.length > 400) {
+  // usually not enough to respond to usefully. But an absent body is not a
+  // short body — it is an unread one, and scoring it as terse would bury
+  // perfectly good posts that an operator simply pasted as a bare link.
+  if (evidence.capture === 'url-only') {
+    reasons.push('Scored on the title only — paste the post text to sharpen this.');
+  } else if (raw.body.length > 400) {
     intent += 12;
     reasons.push('Wrote at length — enough context to respond usefully.');
   } else if (raw.body.length < 80) {
@@ -132,11 +156,21 @@ export function scoreSignal(desk: Desk, raw: RawSignal, now: Date): ScoreResult 
 
   // Usefulness decays fast. A day-old post about a layoff has usually already
   // been answered, and arriving late reads worse than not arriving.
-  const recencyFactor =
-    freshnessHours <= 3 ? 1 : freshnessHours <= 12 ? 0.85 : freshnessHours <= 48 ? 0.6 : 0.3;
+  //
+  // When the age is unknown the honest move is neither to assume it is fresh
+  // (which would inflate every pasted link to the top of the queue) nor to
+  // assume it is stale. It gets the middle factor and the card says so.
+  const recencyFactor = evidence.ageUnknown
+    ? 0.75
+    : freshnessHours <= 3 ? 1 : freshnessHours <= 12 ? 0.85 : freshnessHours <= 48 ? 0.6 : 0.3;
 
-  if (freshnessHours <= 3) reasons.push(`Posted ${Math.round(freshnessHours)}h ago — still live.`);
-  else if (freshnessHours > 48) reasons.push(`${Math.round(freshnessHours / 24)} days old — likely stale.`);
+  if (evidence.ageUnknown) {
+    reasons.push('Age unknown — recency neither credited nor penalised.');
+  } else if (freshnessHours <= 3) {
+    reasons.push(`Posted ${Math.round(freshnessHours)}h ago — still live.`);
+  } else if (freshnessHours > 48) {
+    reasons.push(`${Math.round(freshnessHours / 24)} days old — likely stale.`);
+  }
 
   const clamp = (n: number) => Math.max(0, Math.min(100, Math.round(n)));
   const fitScore = clamp(fit);

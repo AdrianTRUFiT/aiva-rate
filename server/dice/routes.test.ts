@@ -280,3 +280,217 @@ test('a desk view reports subreddits refused by policy', async () => {
   assert.ok(Array.isArray(view.scope.searchable));
   assert.ok(view.scope.searchable.length > 0);
 });
+
+/* ----------------------- operator-assisted ingest ----------------------- */
+
+const REAL_PASTE = `https://www.reddit.com/r/jobs/comments/pw001/laid_off_this_morning_with_no_warning/
+u/quiet_north_412
+posted: 2h
+Fifteen minutes in a meeting room and that was it. I have no idea what to do first. Do I file for
+unemployment today? Do I tell people? My head is going in about nine directions at once and I cannot
+get it to stop long enough to make one decision. Any advice on what actually needs doing in the first
+24 hours?
+
+https://www.reddit.com/r/layoffs/comments/pw002/role_eliminated_four_weeks_notice/
+posted: 5h
+They gave me four weeks after six years. I keep opening the job boards and closing them again.
+How do you get past the first day of this?
+
+https://www.reddit.com/r/antiwork/comments/pw003/i_built_an_app_that_fixes_burnout/
+Check out my landing page, link in bio. DM me for a discount code.
+
+https://www.reddit.com/r/depression/comments/pw004/struggling_lately/
+posted: 1h
+Been having a hard time.
+
+https://www.reddit.com/r/jobs/comments/pw005/i_do_not_want_to_be_here_anymore/
+posted: 1h
+Everything came apart at once and I honestly don't want to be here anymore.
+
+https://www.reddit.com/r/jobs/comments/pw006/which_laptop_for_uni/
+posted: 4h
+Budget is about 900, mostly essays.
+
+https://redd.it/pw007
+`;
+
+test('pasted Reddit URLs become real signals through the same pipeline', async () => {
+  const res = await post('/desks/stabilizer/ingest', { text: REAL_PASTE });
+  assert.equal(res.status, 200);
+  const body = await res.json();
+
+  assert.equal(body.accepted, 6, 'six parseable posts');
+  assert.equal(body.failures.length, 1, 'the short link is reported');
+  assert.equal(body.budgetSpent, 0, 'manual ingest consumes no API quota');
+  assert.match(body.note, /No Reddit API request/);
+
+  // The reduction ran: promotional, off-lens and screened-out material removed.
+  assert.ok(body.counts.screenedOut >= 2, `screened ${body.counts.screenedOut}`);
+  assert.ok(body.counts.relevant >= 1);
+  assert.ok(body.counts.relevant < body.counts.afterDedup);
+});
+
+test('an ingested signal carries its source URL, subreddit, author and capture level', async () => {
+  await post('/desks/stabilizer/ingest', { text: REAL_PASTE });
+  const view = await (await get('/desks/stabilizer?state=priority')).json();
+  const signal = view.signals.find((s: any) => s.postId === 'pw001');
+  assert.ok(signal, 'the strongest real post should reach the priority queue');
+
+  assert.equal(signal.permalink, 'https://www.reddit.com/r/jobs/comments/pw001/');
+  assert.equal(signal.subreddit, 'jobs');
+  assert.equal(signal.author, 'quiet_north_412');
+  assert.equal(signal.capture, 'with-body');
+  assert.equal(signal.ageUnknown, false);
+  assert.equal(signal.source, 'manual');
+  assert.ok(signal.discoveredAt);
+  assert.equal(signal.history[0].event, 'discovered');
+});
+
+test('a crisis post pasted by hand is screened out, not queued', async () => {
+  await post('/desks/stabilizer/ingest', { text: REAL_PASTE });
+  const view = await (await get('/desks/stabilizer?state=do-not-contact')).json();
+  const crisis = view.signals.find((s: any) => s.postId === 'pw005');
+
+  assert.ok(crisis, 'the crisis post must be screened out');
+  assert.equal(crisis.scores.priority, 0);
+  assert.equal(crisis.actions.reply.allowed, false);
+});
+
+test('a post from a blocked subreddit is refused even when pasted deliberately', async () => {
+  await post('/desks/stabilizer/ingest', { text: REAL_PASTE });
+  const view = await (await get('/desks/stabilizer?state=blocked')).json();
+  const blocked = view.signals.find((s: any) => s.postId === 'pw004');
+  assert.ok(blocked, 'r/depression must be refused');
+  assert.match(blocked.screenedReason, /peer support/i);
+});
+
+test('pasting the same posts twice adds nothing', async () => {
+  const first = await (await post('/desks/stabilizer/ingest', { text: REAL_PASTE })).json();
+  const second = await (await post('/desks/stabilizer/ingest', { text: REAL_PASTE })).json();
+  assert.ok(first.counts.afterDedup > 0);
+  assert.equal(second.counts.afterDedup, 0, 're-pasting must be a no-op');
+});
+
+test('a bare URL is scored on its title and says so', async () => {
+  await post('/desks/stabilizer/ingest', {
+    text: 'https://www.reddit.com/r/jobs/comments/pw010/just_got_laid_off_and_i_am_freaking_out/',
+  });
+  const view = await (await get('/desks/stabilizer')).json();
+  const signal = view.signals.find((s: any) => s.postId === 'pw010');
+
+  assert.equal(signal.capture, 'url-only');
+  assert.equal(signal.ageUnknown, true);
+  assert.ok(signal.reasons.some((r: string) => /title only/.test(r)));
+  assert.ok(signal.reasons.some((r: string) => /Age unknown/.test(r)));
+});
+
+test('an ingested signal collides with another desk that already engaged it', async () => {
+  await post('/desks/regulator/ingest', {
+    text: 'https://www.reddit.com/r/antiwork/comments/pw020/completely_burned_out/\nposted: 1h\nRunning on empty for months and dreading every Monday. Any advice on how to come back from this?',
+  });
+  const regulatorView = await (await get('/desks/regulator')).json();
+  const theirs = regulatorView.signals.find((s: any) => s.postId === 'pw020');
+  assert.ok(theirs?.actions.reply.allowed, 'regulator should be able to act first');
+  await post(`/signals/${encodeURIComponent(theirs.id)}/state`, { state: 'activated' });
+
+  // A different desk pastes the same thread.
+  await post('/desks/stabilizer/ingest', {
+    text: 'https://www.reddit.com/r/antiwork/comments/pw020/completely_burned_out/\nposted: 1h\nRunning on empty for months and dreading every Monday. Any advice on how to come back from this?',
+  });
+  const mine = await (await get('/desks/stabilizer')).json();
+  const signal = mine.signals.find((s: any) => s.postId === 'pw020');
+
+  assert.ok(signal.collision, 'the second desk must see the collision');
+  assert.equal(signal.collision.deskId, 'regulator');
+  assert.equal(signal.actions.reply.allowed, false);
+});
+
+test('an empty or unparseable paste is refused clearly', async () => {
+  assert.equal((await post('/desks/stabilizer/ingest', { text: '   ' })).status, 400);
+  const res = await post('/desks/stabilizer/ingest', { text: 'https://example.com/nope' });
+  assert.equal(res.status, 400);
+  assert.match((await res.json()).error, /Reddit/);
+});
+
+/* ---------------------------- the lens editor --------------------------- */
+
+test('a desk exposes its lens with the shipped defaults alongside', async () => {
+  const view = await (await get('/desks/stabilizer')).json();
+  assert.ok(view.lens.subreddits.length > 0);
+  assert.equal(view.lens.edited, false);
+  assert.ok(view.lens.defaults.subreddits.length > 0);
+  assert.equal(typeof view.lens.minScore, 'number');
+  assert.equal(typeof view.lens.maxAgeHours, 'number');
+});
+
+test('an operator can retune a desk without touching code', async () => {
+  const res = await fetch(`${base}/api/dice/desks/stabilizer/lens`, {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json', cookie },
+    body: JSON.stringify({
+      subreddits: ['jobs', 'careerguidance'],
+      keywords: ['laid off', 'severance'],
+      exclusions: ['recruiter'],
+      minScore: 60,
+      maxAgeHours: 24,
+    }),
+  });
+  assert.equal(res.status, 200);
+  const { lens } = await res.json();
+  assert.deepEqual(lens.subreddits, ['jobs', 'careerguidance']);
+  assert.equal(lens.minScore, 60);
+  assert.equal(lens.edited, true);
+
+  // And it survives into the desk view.
+  const view = await (await get('/desks/stabilizer')).json();
+  assert.deepEqual(view.desk.lens.subreddits, ['jobs', 'careerguidance']);
+  assert.deepEqual(view.scope.searchable, ['jobs', 'careerguidance']);
+});
+
+test('the operator cannot add a blocked subreddit — the save fails and says why', async () => {
+  const res = await fetch(`${base}/api/dice/desks/stabilizer/lens`, {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json', cookie },
+    body: JSON.stringify({ subreddits: ['jobs', 'SuicideWatch', 'depression'], keywords: ['x'], exclusions: [] }),
+  });
+  assert.equal(res.status, 422);
+  const body = await res.json();
+  assert.deepEqual(body.refused.map((r: any) => r.name).sort(), ['depression', 'suicidewatch']);
+
+  // Nothing was saved — the operator's stated intent was not silently altered.
+  const view = await (await get('/desks/stabilizer')).json();
+  assert.equal(view.lens.edited, false);
+});
+
+test('a raised score floor actually rejects weaker signals', async () => {
+  await fetch(`${base}/api/dice/desks/stabilizer/lens`, {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json', cookie },
+    body: JSON.stringify({
+      subreddits: ['jobs'], keywords: ['laid off'], exclusions: [], minScore: 99, maxAgeHours: 168,
+    }),
+  });
+
+  await post('/desks/stabilizer/ingest', { text: REAL_PASTE });
+  const view = await (await get('/desks/stabilizer?state=rejected')).json();
+  assert.ok(
+    view.signals.some((s: any) => /score floor of 99/.test(s.screenedReason ?? '')),
+    'the operator-set floor must be the stated reason',
+  );
+});
+
+test('a tightened recency window rejects older posts', async () => {
+  await fetch(`${base}/api/dice/desks/stabilizer/lens`, {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json', cookie },
+    body: JSON.stringify({
+      subreddits: ['jobs'], keywords: ['laid off'], exclusions: [], minScore: 10, maxAgeHours: 3,
+    }),
+  });
+
+  await post('/desks/stabilizer/ingest', {
+    text: 'https://www.reddit.com/r/jobs/comments/pw030/laid_off_last_week/\nposted: 5 days\nStill processing it. Any advice?',
+  });
+  const view = await (await get('/desks/stabilizer?state=rejected')).json();
+  assert.ok(view.signals.some((s: any) => /3h window/.test(s.screenedReason ?? '')));
+});
