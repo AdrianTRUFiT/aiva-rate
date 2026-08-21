@@ -1,33 +1,48 @@
-import React, { useState, useEffect } from 'react';
-import { Moon, Sun, Shield } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Moon, Sun } from 'lucide-react';
+import { cn } from '../lib/utils';
 
-export const Navbar = () => {
+export type View = 'session' | 'console';
+
+export const Navbar = ({ view, onView }: { view: View; onView: (v: View) => void }) => {
   const [isDark, setIsDark] = useState(false);
 
   useEffect(() => {
-    if (isDark) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
+    document.documentElement.classList.toggle('dark', isDark);
   }, [isDark]);
 
   return (
-    <nav className="border-bottom border-border bg-surface/80 backdrop-blur-md sticky top-0 z-50">
-      <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-        <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white shadow-lg shadow-primary/20">
-            <Shield size={18} />
-          </div>
-          <span className="font-bold text-heading tracking-tight">RATE Framework</span>
-        </div>
-        
-        <div className="flex items-center space-x-4">
-          <button 
+    <nav className="border-b border-border bg-surface/85 backdrop-blur-md sticky top-0 z-50">
+      <div className="max-w-5xl mx-auto px-6 h-15 py-3 flex items-center justify-between gap-4">
+        <button onClick={() => onView('session')} className="flex items-center gap-2.5 min-w-0">
+          <span
+            className="w-7 h-7 rounded-full shrink-0"
+            style={{ background: 'linear-gradient(135deg, var(--primary), var(--calm))' }}
+          />
+          <span className="font-semibold text-heading tracking-tight truncate">
+            Performance Wellness
+          </span>
+        </button>
+
+        <div className="flex items-center gap-1">
+          {(['session', 'console'] as View[]).map((v) => (
+            <button
+              key={v}
+              onClick={() => onView(v)}
+              className={cn(
+                'px-3 py-1.5 rounded-full text-sm font-medium transition-colors capitalize',
+                view === v ? 'text-heading bg-surface-muted' : 'text-muted hover:text-body',
+              )}
+            >
+              {v}
+            </button>
+          ))}
+          <button
             onClick={() => setIsDark(!isDark)}
-            className="p-2 rounded-full hover:bg-surface-muted text-muted transition-colors"
+            className="p-2 rounded-full text-muted hover:text-body hover:bg-surface-muted transition-colors ml-1"
+            aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
           >
-            {isDark ? <Sun size={20} /> : <Moon size={20} />}
+            {isDark ? <Sun size={17} /> : <Moon size={17} />}
           </button>
         </div>
       </div>
