@@ -48,9 +48,18 @@ the specification is.
 | Backend Gmail per persona, invisible to users | Kept as `Persona.mailbox` — operational routing only, never surfaced |
 | Engagement swarm, cross-persona comment waves | Not built. One account per channel per persona, publishing on a stated cadence (`src/pw/calendar.ts`) |
 | Anti-detection / staggering to avoid enforcement | Not built. Anti-duplication survives as a *content quality* rule in the prompt engine — vary hooks and metaphors so the writing is not repetitive |
-| 10–20 automated DMs/day to people in crisis | Not built. The funnel is inbound: a person arrives and speaks first |
+| 10–20 automated DMs/day to people in crisis | Not built, and now structurally impossible: DICE denies messaging in every subreddit by policy, and crisis signals are screened out before they can be queued at all. See [dice.md](./dice.md) |
 | "Funnel automation detects micro-transformation, triggers offer" | Built, and gated — `evaluateOffer` in `src/pw/funnel.ts` |
 | Optimisation engine logging which persona earned the transaction | Built as a signed session ledger (`OFFER_ACCEPTED` carries `attributedPersona`) |
+
+## Outbound, done the defensible way
+
+DICE (added later — see [dice.md](./dice.md)) is the outbound layer, built
+within these limits rather than around them. Ten desks listen through ten
+different lenses; a cross-desk collision check stops two of them ever working
+the same person; channel actions default to denied and messaging is off
+everywhere; crisis posts are screened out rather than prioritised. What it does
+not do is manufacture agreement between desks, which is the line below.
 
 ## The line, in one rule
 

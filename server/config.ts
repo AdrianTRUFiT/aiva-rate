@@ -33,6 +33,11 @@ export const config = {
     currency: process.env.RESET_CURRENCY ?? 'usd',
   },
 
+  /** DICE operator console. */
+  operator: {
+    password: process.env.OPERATOR_PASSWORD ?? '',
+  },
+
   mail: {
     from: process.env.MAIL_FROM ?? 'Performance Wellness <guide@example.invalid>',
     /** Resend API key. Absent → messages are written to the outbox directory. */

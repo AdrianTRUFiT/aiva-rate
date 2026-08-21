@@ -4,6 +4,7 @@ import { Navbar, type View } from './ui/Navbar';
 import { SessionFlow } from './ui/SessionFlow';
 import { Week } from './screens/Week';
 import { Console } from './console/Console';
+import { OperatorGate } from './dice/OperatorGate';
 import { awaitActivation, useWeek } from './state/weekStore';
 
 /**
@@ -43,7 +44,7 @@ export default function App() {
       <Navbar view={view} onView={setView} inWeek={inWeek} />
       <main className="flex-grow">
         {view === 'console' ? (
-          <Console />
+          <OperatorGate>{(signOut) => <Console onSignOut={signOut} />}</OperatorGate>
         ) : phase === 'loading' || activating ? (
           <div className="min-h-[60vh] flex flex-col items-center justify-center gap-3 text-muted">
             <Loader2 size={20} className="animate-spin" />

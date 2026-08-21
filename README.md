@@ -77,11 +77,27 @@ Enforced in three independent places. See
 - [Funnel doctrine and the offer gate](docs/performance-wellness/funnel-doctrine.md)
 - [Safety policy](docs/performance-wellness/safety-policy.md)
 - [The ten guides](docs/performance-wellness/personas.md)
+- [DICE](docs/performance-wellness/dice.md) — the ten-desk prospecting console
 - [Commercial continuity](docs/performance-wellness/commercial-continuity.md) — persistence, identity, payment, delivery
 - [Distribution policy](docs/performance-wellness/distribution-policy.md) — what was built, what was not, and why
 
+## DICE
+
+An operator console sitting on top of Reddit: ten company-operated desks, each
+with its own authenticated account, listening lens, rate budget and queue. Open
+a desk and get a prioritised queue — `513 discovered → 99 relevant → 19 strong →
+12 worth today`.
+
+Three rules hold in code: a desk spends only its own rate limit and defers when
+spent (never continuing on another desk's), no two desks may unknowingly work
+the same person, and channel actions default to denied. Crisis signals mean *do
+not contact* — screened before scoring, never queued, terminal.
+
+The real Reddit adapter sits behind a provider seam and is not implemented; the
+fixture source emulates ten workspaces so the whole workflow runs today.
+
 ## Status
 
-The commercial path runs end to end (107 tests). Not built: refunds, a datastore
+The commercial path runs end to end (164 tests). Not built: refunds, a datastore
 that survives concurrent instances, email deliverability handling, rate
 limiting, data deletion, and anything that posts to a platform.

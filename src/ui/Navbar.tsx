@@ -43,7 +43,7 @@ export const Navbar = ({
                 view === v ? 'text-heading bg-surface-muted' : 'text-muted hover:text-body',
               )}
             >
-              {v === 'session' && inWeek ? 'my week' : v}
+              {v === 'session' ? (inWeek ? 'my week' : 'session') : 'operator'}
             </button>
           ))}
           <button

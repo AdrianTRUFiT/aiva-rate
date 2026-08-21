@@ -37,6 +37,15 @@ breathing exercise and then a sales prompt at someone in crisis.
 and ordinary distress ("I just got laid off and I'm freaking out", "this job is
 killing me") must *not* be routed away from the help it came for.
 
+## The rule inverts for outbound
+
+Everything above concerns someone who came to us and typed into our own box.
+DICE approaches people instead, and there a crisis signal means the opposite of
+urgent: **do not contact**. Such a signal is screened before scoring, carries
+priority 0, is never queued, has both channel actions denied, and is terminal —
+no operator click can move it back into a working queue. See
+[dice.md](./dice.md).
+
 ## Categories screened
 
 `self-harm`, `harm-to-others`, `abuse`, `medical-emergency`, `acute-substance`.

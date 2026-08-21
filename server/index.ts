@@ -6,6 +6,10 @@ import { config, mailLive, secretIsEphemeral, stripeLive } from './config';
 import { FileEnrollmentRepository } from './store/fileStore';
 import { paymentProvider } from './payments';
 import { buildDevRoutes, buildRoutes } from './routes';
+import { FileDiceRepository } from './dice/store';
+import { buildDiceRoutes } from './dice/routes';
+import { initOperatorAuth } from './dice/auth';
+import { signalSource } from './dice/sources';
 import { startScheduler } from './scheduler';
 import { appClock } from './clock';
 
@@ -35,6 +39,11 @@ app.get('/api/health', (_req, res) => {
 
 app.use('/api', buildRoutes(deps));
 
+// DICE — the operator console. Every route below sits behind operator auth.
+const diceRepo = new FileDiceRepository(config.dataDir);
+const operatorAuth = initOperatorAuth(config.operator.password, secret);
+app.use('/api/dice', buildDiceRoutes({ repo: diceRepo, auth: operatorAuth, clock: appClock }));
+
 // The stand-in checkout page exists only when there is no real Stripe key, so
 // it can never be reachable in a deployment that takes actual payments.
 if (!stripeLive()) app.use('/api', buildDevRoutes(deps));
@@ -57,5 +66,9 @@ app.listen(config.port, () => {
   }
   if (!stripeLive()) {
     console.warn('[pw] STRIPE_SECRET_KEY is unset — no real payments can be taken.');
+  }
+  console.log(`[dice] signal source: ${signalSource().name}`);
+  if (operatorAuth.ephemeral) {
+    console.warn(`[dice] OPERATOR_PASSWORD is unset. This run's password: ${operatorAuth.password}`);
   }
 });

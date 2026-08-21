@@ -9,9 +9,12 @@ import { PromptStudio } from './PromptStudio';
 import { PersonaMark } from '../ui/PersonaBadge';
 import { cn } from '../lib/utils';
 
-type Tab = 'guides' | 'calendar' | 'prompts' | 'ledger';
+import { Dice } from '../dice/Dice';
+
+type Tab = 'dice' | 'guides' | 'calendar' | 'prompts' | 'ledger';
 
 const TABS: { id: Tab; label: string }[] = [
+  { id: 'dice', label: 'DICE' },
   { id: 'guides', label: 'Guides' },
   { id: 'calendar', label: 'Calendar' },
   { id: 'prompts', label: 'Prompt studio' },
@@ -148,8 +151,20 @@ const Ledger = () => {
   );
 };
 
-export const Console = () => {
-  const [tab, setTab] = useState<Tab>('guides');
+export const Console = ({ onSignOut }: { onSignOut: () => void }) => {
+  const [tab, setTab] = useState<Tab>('dice');
+
+  // DICE gets the full width; the reference tabs keep the narrower column.
+  if (tab === 'dice') {
+    return (
+      <div className="space-y-0">
+        <div className="max-w-6xl mx-auto px-6 pt-8">
+          <Tabs tab={tab} setTab={setTab} />
+        </div>
+        <Dice onSignOut={onSignOut} />
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-5xl mx-auto px-6 py-10 space-y-7">
@@ -161,22 +176,7 @@ export const Console = () => {
         </p>
       </div>
 
-      <div className="flex gap-1 border-b border-border">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            className={cn(
-              'px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors',
-              tab === t.id
-                ? 'border-primary text-heading'
-                : 'border-transparent text-muted hover:text-body',
-            )}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <Tabs tab={tab} setTab={setTab} />
 
       {tab === 'guides' && <Guides />}
       {tab === 'calendar' && <Calendar />}
@@ -185,3 +185,20 @@ export const Console = () => {
     </div>
   );
 };
+
+const Tabs = ({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) => (
+  <div className="flex gap-1 border-b border-border overflow-x-auto">
+    {TABS.map((t) => (
+      <button
+        key={t.id}
+        onClick={() => setTab(t.id)}
+        className={cn(
+          'px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap',
+          tab === t.id ? 'border-primary text-heading' : 'border-transparent text-muted hover:text-body',
+        )}
+      >
+        {t.label}
+      </button>
+    ))}
+  </div>
+);

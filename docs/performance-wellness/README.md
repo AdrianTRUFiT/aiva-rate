@@ -37,6 +37,7 @@ engine behind them.
 | Delivery | `server/delivery.ts`, `server/scheduler.ts` | When each day unlocks, and the idempotent sweep that sends it. |
 | Mail | `server/mail/` | Resend over HTTP, or a file outbox when unconfigured. |
 | Routes | `server/routes.ts` | Enrol, webhook, resume, today, check-in. |
+| **DICE** | `server/dice/` | Ten-desk Reddit prospecting console — see [dice.md](./dice.md). |
 
 ## Two decisions worth knowing before reading the code
 
@@ -76,6 +77,7 @@ set — see `.env.example`. The session engine has no runtime model dependency.
 - [Funnel doctrine and the offer gate](./funnel-doctrine.md)
 - [Safety policy](./safety-policy.md) — **read before pointing this at real people**
 - [The ten guides](./personas.md)
+- [DICE](./dice.md) — the ten-desk prospecting console
 - [Commercial continuity](./commercial-continuity.md) — persistence, identity, payment, delivery
 - [Distribution policy](./distribution-policy.md) — what was built, what was not, and why
 
