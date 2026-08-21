@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Pause, Play, SkipForward, Check } from 'lucide-react';
 import { useSession } from '../state/sessionStore';
-import { PersonaMark } from '../ui/PersonaBadge';
-import { getPersona } from '../pw/personas';
+import { SoulHostMark } from '../ui/SoulHost';
 import { cn } from '../lib/utils';
 
 /**
@@ -59,10 +58,9 @@ export const Action = () => {
     return () => clearTimeout(t);
   }, [running, remaining, index, stepCount, next]);
 
-  if (!intervention || !session.persona) return null;
+  if (!intervention) return null;
 
   const step = intervention.steps[index];
-  const persona = getPersona(session.persona);
   const pct = step.seconds > 0 ? ((step.seconds - remaining) / step.seconds) * 100 : 100;
 
   return (
@@ -70,8 +68,8 @@ export const Action = () => {
       <div className="w-full max-w-xl space-y-10">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <PersonaMark persona={session.persona} size={30} />
-            <span className="text-sm text-muted">{persona.name}</span>
+            <SoulHostMark size={28} />
+            <span className="text-sm text-muted">{intervention.name}</span>
           </div>
           <span className="text-sm text-muted tabular-nums">
             Step {index + 1} of {stepCount}

@@ -1,23 +1,26 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Check, ShieldAlert } from 'lucide-react';
 import { useSession } from '../state/sessionStore';
 import { buildResetPlan, RESET_OFFER } from '../pw/continuity';
-import { getPersona } from '../pw/personas';
-import { PersonaMark } from '../ui/PersonaBadge';
+import { Enroll } from './Enroll';
 
 /**
  * The transaction — offered once, plainly, after something already worked.
  *
- * The gate is re-checked here rather than trusted from the previous screen. A
- * commercial offer that can be reached by a routing bug is exactly the failure
- * this architecture exists to prevent.
+ * The gate is re-checked here rather than trusted from the previous screen,
+ * and again on the server before a charge is created. A commercial offer
+ * reachable by a routing bug is exactly the failure this architecture exists
+ * to prevent.
+ *
+ * The week is shown as seven exercises, not seven personalities. The guides
+ * chose them; the person does not need to meet the guides.
  */
 export const Offer = () => {
   const session = useSession((s) => s.session);
-  const accept = useSession((s) => s.acceptOffer);
   const decline = useSession((s) => s.declineOffer);
   const reset = useSession((s) => s.reset);
   const decision = useSession((s) => s.offerDecision)();
+  const [enrolling, setEnrolling] = useState(false);
 
   const plan = useMemo(
     () => (session.pressure ? buildResetPlan(session.pressure) : []),
@@ -58,6 +61,8 @@ export const Offer = () => {
     );
   }
 
+  if (enrolling) return <Enroll onBack={() => setEnrolling(false)} />;
+
   return (
     <div className="px-6 py-14">
       <div className="max-w-xl mx-auto space-y-9">
@@ -80,20 +85,16 @@ export const Offer = () => {
           <p className="eyebrow">Built around what you came in with</p>
           <div className="space-y-2">
             {plan.map((day) => (
-              <div key={day.day} className="flex items-center gap-3 px-4 py-3 rounded-xl bg-surface-muted">
+              <div key={day.day} className="flex items-baseline gap-4 px-4 py-3 rounded-xl bg-surface-muted">
                 <span className="text-xs text-muted tabular-nums w-11 shrink-0">Day {day.day}</span>
-                <PersonaMark persona={day.persona} size={24} />
-                <span className="text-sm text-body truncate">{day.intervention.name}</span>
-                <span className="text-xs text-muted ml-auto shrink-0 hidden sm:block">
-                  {getPersona(day.persona).name}
-                </span>
+                <span className="text-sm text-body">{day.intervention.name}</span>
               </div>
             ))}
           </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-5 pt-2">
-          <button onClick={accept} className="btn-primary">
+          <button onClick={() => setEnrolling(true)} className="btn-primary">
             Yes, walk me through the week
           </button>
           <button onClick={decline} className="btn-quiet">

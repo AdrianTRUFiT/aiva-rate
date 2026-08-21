@@ -1,6 +1,6 @@
 import { ArrowRight, LifeBuoy } from 'lucide-react';
 import { useSession } from '../state/sessionStore';
-import { PersonaBadge } from '../ui/PersonaBadge';
+import { SoulHostBadge } from '../ui/SoulHost';
 import { getPersona } from '../pw/personas';
 import { SUPPORT_RESOURCES } from '../pw/safety';
 
@@ -26,7 +26,7 @@ export const Transformation = () => {
     return (
       <div className="px-6 py-14">
         <div className="max-w-xl mx-auto space-y-8">
-          <PersonaBadge persona={session.persona} />
+          <SoulHostBadge />
           <div className="space-y-5">
             <p className="eyebrow">What just happened</p>
             <h1 className="text-2xl md:text-3xl leading-snug">

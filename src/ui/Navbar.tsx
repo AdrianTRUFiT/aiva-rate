@@ -4,7 +4,16 @@ import { cn } from '../lib/utils';
 
 export type View = 'session' | 'console';
 
-export const Navbar = ({ view, onView }: { view: View; onView: (v: View) => void }) => {
+export const Navbar = ({
+  view,
+  onView,
+  inWeek = false,
+}: {
+  view: View;
+  onView: (v: View) => void;
+  /** Relabels the session tab when a paid week is in progress. */
+  inWeek?: boolean;
+}) => {
   const [isDark, setIsDark] = useState(false);
 
   useEffect(() => {
@@ -34,7 +43,7 @@ export const Navbar = ({ view, onView }: { view: View; onView: (v: View) => void
                 view === v ? 'text-heading bg-surface-muted' : 'text-muted hover:text-body',
               )}
             >
-              {v}
+              {v === 'session' && inWeek ? 'my week' : v}
             </button>
           ))}
           <button

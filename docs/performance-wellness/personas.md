@@ -2,9 +2,21 @@
 
 Defined in `src/pw/personas.ts`. Each owns one front door and one exercise.
 
-Every guide is a named voice belonging to one brand, disclosed as AI wherever
-it speaks. They are not independent people and they do not validate each other
-in public as though they were — see [distribution-policy.md](./distribution-policy.md).
+**The guides are not shown to the person.** All ten do real work — they select
+the copy, the exercise, and the shape of the week, and the session ledger
+records which one earned a transaction — but none is introduced by name in the
+product. `SoulHost` (`src/pw/soulhost.ts`) is the single human-facing voice and
+holds continuity across the whole journey, including the paid week.
+
+The reasoning: a cast of ten named personalities asks someone in distress to
+form ten relationships at the moment they have capacity for none. The table
+below is an operator reference and a content-production reference, not a
+character list for users.
+
+For published content each guide is a named voice belonging to one brand,
+disclosed as AI wherever it speaks. They are not independent people and they do
+not validate each other in public as though they were — see
+[distribution-policy.md](./distribution-policy.md).
 
 | Guide | Front door | Exercise | The change |
 |---|---|---|---|
@@ -22,9 +34,11 @@ in public as though they were — see [distribution-policy.md](./distribution-po
 ## Visual identity
 
 Each guide carries a symbol, a two-colour palette, and a style, rendered by
-`PersonaMark` (`src/ui/PersonaBadge.tsx`) so the same guide looks the same
-everywhere it appears. Faceless and abstract throughout — no human faces, no
-personal branding.
+`PersonaMark` (`src/ui/PersonaBadge.tsx`). Faceless and abstract throughout — no
+human faces, no personal branding.
+
+These are used in the operator console and in published content. Inside the
+product the person sees one mark: SoulHost's.
 
 Full table under **Guides** in the operator console.
 

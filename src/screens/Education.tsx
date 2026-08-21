@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { ArrowRight, Clock } from 'lucide-react';
 import { useSession } from '../state/sessionStore';
 import { compose } from '../pw/promptEngine';
-import { PersonaBadge } from '../ui/PersonaBadge';
+import { SoulHostBadge } from '../ui/SoulHost';
 
 /**
  * Education — one idea, small enough to keep.
@@ -26,7 +26,7 @@ export const Education = () => {
   return (
     <div className="px-6 py-14">
       <div className="max-w-xl mx-auto space-y-8">
-        <PersonaBadge persona={session.persona} />
+        <SoulHostBadge />
 
         <div className="space-y-5">
           <h1 className="text-2xl">{intervention.name}</h1>

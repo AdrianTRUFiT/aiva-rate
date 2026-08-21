@@ -19,10 +19,13 @@ Three independent places enforce this, deliberately:
    pressure, a persona, or an intervention bound to it.
 2. `SessionFlow` checks `safetyRouted` before it renders any stage.
 3. `evaluateOffer` refuses on `safetyRouted` before it evaluates anything else.
+4. `POST /api/enroll` re-runs that same gate server-side, so a routed session
+   cannot be charged even if the browser is bypassed entirely.
+5. `POST /api/checkin` screens every daily note and pauses the week on a trip.
 
-Any one of these would be sufficient. All three exist because the failure mode
-— an offer shown to someone who said they wanted to die — is not one to leave
-to a single conditional.
+Any one of these would be sufficient. All five exist because the failure mode
+— an offer shown to, or a charge taken from, someone who said they wanted to
+die — is not one to leave to a single conditional.
 
 ## Tuned for recall, not precision
 
@@ -52,8 +55,12 @@ a great many people in crisis actually write.
       Every number needs verifying, on a recurring schedule — helplines change.
 - [ ] **Add a human escalation path.** Right now the system hands over a phone
       number. Anything running continuity check-ins needs a route to a person.
-- [ ] **Re-screen continuation check-ins.** Day-4 free text is currently stored
-      unscreened; the same screen must run on every check-in, not just entry.
+- [x] **Re-screen continuation check-ins.** Done: `POST /api/checkin` screens
+      every note server-side. A trip pauses delivery permanently, refuses
+      further check-ins, sends one message containing only helplines, and does
+      not store the note. Covered in `server/routes.test.ts`.
+- [ ] **Decide the refund policy for a safety pause.** Delivery stops; the
+      charge currently stands. That is a policy call, not a code change.
 - [ ] **Review by someone clinically qualified.** Every intervention, every
       empathy line, and the screen itself. Nothing here has had that review.
 - [ ] **Decide the minor policy.** "Starting college" is an explicit front

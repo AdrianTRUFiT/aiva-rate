@@ -1,5 +1,5 @@
 import { useSession } from '../state/sessionStore';
-import { PersonaBadge } from '../ui/PersonaBadge';
+import { SoulHostBadge } from '../ui/SoulHost';
 import type { ShiftReport } from '../pw/types';
 
 /**
@@ -24,7 +24,7 @@ export const Checkpoint = () => {
   return (
     <div className="min-h-[70vh] flex flex-col items-center justify-center px-6 py-14">
       <div className="w-full max-w-xl space-y-9">
-        <PersonaBadge persona={session.persona} />
+        <SoulHostBadge />
 
         <h1 className="text-2xl md:text-3xl leading-snug">
           {session.intervention.checkpointQuestion}

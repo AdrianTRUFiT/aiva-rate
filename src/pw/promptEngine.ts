@@ -1,5 +1,6 @@
 import { getPersona } from './personas';
 import { getPressure } from './pressure';
+import { SOULHOST } from './soulhost';
 import type {
   Channel,
   ContentFormat,
@@ -172,16 +173,21 @@ export function compose(
   pressureId: PressureId,
   intervention: Intervention,
 ): ComposedResponse {
-  const persona = getPersona(personaId);
   const pressure = getPressure(pressureId);
+
+  // personaId is what selected this copy and this exercise, and it is what the
+  // ledger attributes the session to — but it is deliberately not named to the
+  // person. SoulHost is the voice; the guides work behind it. See soulhost.ts.
+  void personaId;
 
   return {
     empathy: EMPATHY[pressureId],
     understanding: pressure.mechanism,
     reframe: REFRAME[pressureId],
     education: intervention.premise,
-    bridge: `${persona.name} will take you through ${intervention.name}. It takes about ${Math.round(
-      intervention.durationSeconds / 60,
-    )} minute${intervention.durationSeconds >= 90 ? 's' : ''}, and you can stop at any point.`,
+    bridge: SOULHOST.handoff(
+      intervention.name,
+      Math.max(1, Math.round(intervention.durationSeconds / 60)),
+    ),
   };
 }

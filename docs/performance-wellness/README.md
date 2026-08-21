@@ -20,9 +20,23 @@ engine behind them.
 | Prompt engine | `src/pw/promptEngine.ts` | Assembles persona prompts for content work; composes in-product copy deterministically. |
 | Continuity | `src/pw/continuity.ts` | The 7-Day Under Pressure Reset, built per pressure moment. |
 | Calendar | `src/pw/calendar.ts` | The weekly publishing rhythm per guide. |
-| Session | `src/state/sessionStore.ts` | Journey state, signed event ledger. |
-| Screens | `src/screens/` | One per funnel stage. |
+| SoulHost | `src/pw/soulhost.ts` | The single human-facing voice. The ten guides work behind it. |
+| Session | `src/state/sessionStore.ts` | Anonymous journey state, signed event ledger. Never transmitted. |
+| Week | `src/state/weekStore.ts` | A paid week in progress, served from the enrolment. |
+| Screens | `src/screens/` | One per funnel stage, plus enrolment and the week. |
 | Console | `src/console/` | Operator view: guides, calendar, prompt studio, session ledger. |
+| **Server** | `server/` | Persistence, identity, payment, delivery — see below. |
+
+## The server
+
+| Layer | Where | What it does |
+|---|---|---|
+| Store | `server/store/` | `EnrollmentRepository` + an atomically-written file implementation. |
+| Identity | `server/identity.ts` | Opaque resume tokens. No accounts, no passwords. |
+| Payments | `server/payments/` | Stripe Checkout over REST, plus a local stand-in for running without credentials. |
+| Delivery | `server/delivery.ts`, `server/scheduler.ts` | When each day unlocks, and the idempotent sweep that sends it. |
+| Mail | `server/mail/` | Resend over HTTP, or a file outbox when unconfigured. |
+| Routes | `server/routes.ts` | Enrol, webhook, resume, today, check-in. |
 
 ## Two decisions worth knowing before reading the code
 
@@ -32,6 +46,12 @@ pressure records. The full set of things this system can say to someone in
 distress is therefore enumerable and reviewable in advance. The model-facing
 side (`buildPrompt`) is for *content production*, where a human reviews the
 output before it ships. Nothing calls a model at runtime.
+
+**The guides are capabilities, not a cast.** All ten do real work — they select
+the copy, the exercise, and the shape of the week, and the ledger records which
+one earned a transaction. None of them is introduced to the person by name.
+SoulHost holds continuity at the human-facing edge; asking someone in distress
+to form ten relationships is asking for something they do not have to give.
 
 **The classifier is keyword-scored, not learned.** Deliberately: the routing
 decision for someone in distress should be explainable, testable, and
@@ -43,22 +63,28 @@ and then insists is worse than one that asks.
 
 ```bash
 npm install
-npm run dev      # http://localhost:3000
+npm run dev      # web on :3000, API on :3001
 npm run check    # typecheck + tests
 ```
 
-No API key is required — the app has no runtime model dependency.
+No credentials are required for any of it. Payments use a local stand-in and
+daily messages are written to `.data/outbox/` until Stripe and mail keys are
+set — see `.env.example`. The session engine has no runtime model dependency.
 
 ## Documents
 
 - [Funnel doctrine and the offer gate](./funnel-doctrine.md)
 - [Safety policy](./safety-policy.md) — **read before pointing this at real people**
 - [The ten guides](./personas.md)
+- [Commercial continuity](./commercial-continuity.md) — persistence, identity, payment, delivery
 - [Distribution policy](./distribution-policy.md) — what was built, what was not, and why
 
 ## Status
 
-The session engine is complete and tested end to end. What is **not** built:
-persistence (state is in-memory, a reload starts over), accounts, payment,
-delivery of the 7-day sequence outside the browser, and anything that posts to
-a platform. The safety policy lists what has to happen before real users.
+The full commercial path runs end to end: arrive → one intervention → reported
+improvement → offer → pay → return tomorrow with context intact → receive Day 2.
+
+What is **not** built: refunds, a datastore that survives concurrent instances,
+email deliverability handling, rate limiting, data deletion, and anything that
+posts to a platform. The safety policy lists what has to happen before real
+users; `commercial-continuity.md` lists the rest.

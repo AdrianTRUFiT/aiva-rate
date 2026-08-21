@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ArrowRight } from 'lucide-react';
 import { useSession } from '../state/sessionStore';
-import { Disclosure } from '../ui/Disclosure';
+import { Disclosure } from '../ui/SoulHost';
 
 /**
  * SoulHost — the threshold.
@@ -46,7 +46,8 @@ export const Threshold = () => {
 
           <div className="flex flex-wrap items-center justify-between gap-4">
             <p className="text-xs text-muted">
-              Stays in your browser. Nothing is sent anywhere and no account is created.
+              Stays in your browser. Nothing is sent anywhere unless you later choose to go
+              further, and no account is created.
             </p>
             <button
               onClick={() => submit(text)}

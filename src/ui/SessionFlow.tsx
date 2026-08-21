@@ -9,7 +9,6 @@ import { Action } from '../screens/Action';
 import { Checkpoint } from '../screens/Checkpoint';
 import { Transformation } from '../screens/Transformation';
 import { Offer } from '../screens/Offer';
-import { Continuation } from '../screens/Continuation';
 
 /**
  * Renders whichever stage the session is in.
@@ -48,7 +47,8 @@ export const SessionFlow = () => {
           {session.stage === 'CHECKPOINT' && <Checkpoint />}
           {session.stage === 'TRANSFORMATION' && <Transformation />}
           {session.stage === 'OFFER' && <Offer />}
-          {session.stage === 'CONTINUATION' && <Continuation />}
+          {/* CONTINUATION is not rendered here: once a week is paid for it is
+              served from the enrolment by <Week />, not from browser state. */}
         </motion.div>
       </AnimatePresence>
     </div>

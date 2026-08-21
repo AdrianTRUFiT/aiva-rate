@@ -3,8 +3,7 @@ import { ArrowRight } from 'lucide-react';
 import { useSession } from '../state/sessionStore';
 import { compose } from '../pw/promptEngine';
 import { getPressure, PRESSURE_ORDER, PRESSURE_MOMENTS } from '../pw/pressure';
-import { PersonaBadge } from '../ui/PersonaBadge';
-import { Disclosure } from '../ui/Disclosure';
+import { Disclosure, SoulHostBadge } from '../ui/SoulHost';
 import { cn } from '../lib/utils';
 
 /**
@@ -33,7 +32,7 @@ export const Reflection = () => {
   return (
     <div className="px-6 py-14">
       <div className="max-w-xl mx-auto space-y-8">
-        <PersonaBadge persona={session.persona} />
+        <SoulHostBadge />
 
         <div className="space-y-6">
           <p className="text-xl md:text-2xl text-heading leading-snug">{copy.empathy}</p>
