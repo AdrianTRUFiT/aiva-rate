@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { AlertTriangle, ArrowUpRight, Ban, Check, Clock, Eye, Lock, Users } from 'lucide-react';
+import { AlertTriangle, ArrowUpRight, Ban, Check, Clock, Eye, Lock, Search, Users } from 'lucide-react';
 import * as api from './api';
-import type { DeskView, SignalState } from './api';
+import type { DeskView, Recommendation, Signal, SignalState } from './api';
+import { SignalDetail } from './SignalDetail';
 import { cn } from '../lib/utils';
 
 /**
@@ -52,6 +53,10 @@ export const Desk = ({
   const [active, setActive] = useState<string>('priority');
   const [pending, setPending] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  // The opened signal is captured by value, not looked up by id each render:
+  // once activated it can fall out of the current (filtered) queue, and the
+  // panel should keep showing what the operator just did, not disappear.
+  const [openSignal, setOpenSignal] = useState<(Signal & { aiop: Recommendation }) | null>(null);
 
   const transition = async (id: string, state: SignalState) => {
     setPending(id);
@@ -155,14 +160,29 @@ export const Desk = ({
                     <Clock size={11} />
                     <span className="tabular-nums">{Math.round(signal.scores.freshnessHours)}h</span>
                   </div>
-                  <h3 className="text-base font-semibold text-heading">{signal.title}</h3>
+                  <button
+                    onClick={() => setOpenSignal(signal)}
+                    className="text-base font-semibold text-heading text-left hover:underline"
+                  >
+                    {signal.title}
+                  </button>
                 </div>
-                <span
-                  className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide shrink-0"
-                  style={{ background: verdict.bg, color: verdict.fg }}
-                >
-                  {signal.aiop.verdict}
-                </span>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span
+                    className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide"
+                    style={{ background: verdict.bg, color: verdict.fg }}
+                  >
+                    {signal.aiop.verdict}
+                  </span>
+                  <button
+                    onClick={() => setOpenSignal(signal)}
+                    className="btn-quiet p-1 no-underline"
+                    title="Open full detail"
+                    aria-label="Open full detail"
+                  >
+                    <Search size={14} />
+                  </button>
+                </div>
               </div>
 
               <p className="text-sm text-body">{signal.excerpt}</p>
@@ -276,6 +296,14 @@ export const Desk = ({
           );
         })}
       </div>
+
+      {openSignal && (
+        <SignalDetail
+          signal={openSignal}
+          onClose={() => setOpenSignal(null)}
+          onChanged={onChanged}
+        />
+      )}
     </div>
   );
 };

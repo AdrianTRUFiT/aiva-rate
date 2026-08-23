@@ -20,8 +20,7 @@ export const DeskGrid = ({
   <div className={cn('grid gap-3', compact ? 'grid-cols-1 content-start' : 'sm:grid-cols-2 lg:grid-cols-3')}>
     {summaries.map(({ desk, counts, queue, budget }) => {
       const isSelected = desk.id === selected;
-      const unprocessed = (queue.new ?? 0) + (queue.priority ?? 0);
-      const active = (queue.activated ?? 0) + (queue.replied ?? 0) + (queue['follow-up'] ?? 0);
+      const activated = queue.activated ?? 0;
 
       return (
         <button
@@ -51,20 +50,23 @@ export const DeskGrid = ({
           {!compact && (
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs tabular-nums">
               <span className="text-body">
-                <strong className="text-heading">{unprocessed}</strong> unprocessed
+                <strong className="text-heading">{counts.discovered}</strong> discovered
+              </span>
+              <span className="text-body">
+                <strong className="text-heading">{counts.relevant}</strong> relevant
               </span>
               <span className="text-body">
                 <strong style={{ color: 'var(--primary)' }}>{queue.priority ?? 0}</strong> priority
               </span>
               <span className="text-body">
-                <strong className="text-heading">{active}</strong> active
+                <strong style={{ color: 'var(--calm)' }}>{activated}</strong> activated
               </span>
             </div>
           )}
 
           {compact && (
             <div className="text-xs text-muted tabular-nums">
-              {queue.priority ?? 0} priority · {unprocessed} queued
+              {queue.priority ?? 0} priority · {activated} activated
             </div>
           )}
 
