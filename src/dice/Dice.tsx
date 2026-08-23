@@ -1,10 +1,19 @@
-import { useCallback, useEffect, useState } from 'react';
-import { AlertTriangle, ChevronDown, Loader2, LogOut, RefreshCw, ShieldAlert } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { AlertTriangle, ChevronDown, Loader2, LogOut, Radio, RefreshCw, ShieldAlert } from 'lucide-react';
 import * as api from './api';
 import type { DesksResponse, DeskView } from './api';
 import { DeskGrid } from './DeskGrid';
 import { Desk } from './Desk';
 import { cn } from '../lib/utils';
+
+const Metric = ({ label, value, tone }: { label: string; value: number | string; tone?: string }) => (
+  <div className="min-w-[84px]">
+    <p className="text-[10px] uppercase tracking-wide text-muted">{label}</p>
+    <p className="text-lg font-semibold tabular-nums" style={tone ? { color: tone } : undefined}>
+      {value}
+    </p>
+  </div>
+);
 
 /**
  * DICE — the ten-desk prospecting console.
@@ -20,6 +29,22 @@ export const Dice = ({ onSignOut }: { onSignOut: () => void }) => {
   const [error, setError] = useState<string | null>(null);
   const [policy, setPolicy] = useState<Awaited<ReturnType<typeof api.loadPolicy>> | null>(null);
   const [showPolicy, setShowPolicy] = useState(false);
+
+  // Derived aggregates the overview route doesn't precompute. Every number
+  // here is a straight sum over the real per-desk counts/queue the server
+  // already sent — no field is invented, no state is simulated client-side.
+  const aggregate = useMemo(() => {
+    const desks = overview?.desks ?? [];
+    const sumQueue = (state: string) =>
+      desks.reduce((n, d) => n + (d.queue[state as keyof typeof d.queue] ?? 0), 0);
+    return {
+      discovered: desks.reduce((n, d) => n + d.counts.discovered, 0),
+      relevant: desks.reduce((n, d) => n + d.counts.relevant, 0),
+      activated: sumQueue('activated'),
+      followUp: sumQueue('follow-up'),
+      qualified: sumQueue('qualified'),
+    };
+  }, [overview]);
 
   const refreshOverview = useCallback(async () => {
     try {
@@ -81,11 +106,13 @@ export const Dice = ({ onSignOut }: { onSignOut: () => void }) => {
   return (
     <div className="max-w-6xl mx-auto px-6 py-8 space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="space-y-1.5">
+        <div className="space-y-1">
           <h1 className="text-2xl">DICE</h1>
-          <p className="text-sm text-body">
-            {overview.desks.length} desks · {overview.totals.signals.toLocaleString()} signals ·{' '}
-            {overview.totals.priority} priority · {overview.totals.active} active
+          <p className="flex items-center gap-1.5 text-xs text-muted">
+            <Radio size={11} style={{ color: overview.simulated ? 'var(--warning)' : 'var(--calm)' }} />
+            Source <strong className="text-heading">{overview.source}</strong>
+            {overview.simulated && <span style={{ color: 'var(--warning)' }}>· simulated</span>}
+            <span>· {overview.desks.length} desks</span>
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -99,6 +126,17 @@ export const Dice = ({ onSignOut }: { onSignOut: () => void }) => {
             <LogOut size={14} /> Sign out
           </button>
         </div>
+      </div>
+
+      {/* Header metrics — every figure is a real sum of what the server sent. */}
+      <div className="card p-4 flex flex-wrap gap-x-8 gap-y-3">
+        <Metric label="Discovered" value={aggregate.discovered.toLocaleString()} />
+        <Metric label="Relevant" value={aggregate.relevant.toLocaleString()} />
+        <Metric label="Priority" value={overview.totals.priority} tone="var(--primary)" />
+        <Metric label="Activated" value={aggregate.activated} tone="var(--calm)" />
+        <Metric label="Follow-up" value={aggregate.followUp} />
+        <Metric label="Qualified" value={aggregate.qualified} />
+        <Metric label="Screened out" value={overview.totals.screenedOut} />
       </div>
 
       {overview.simulated && (
